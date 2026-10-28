@@ -7,14 +7,20 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Use the same pinned devkita64 tag as your other Switch repos (replace :latest if you pin one)
     container: devkitpro/devkita64:latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install libraries
+      # pkg.devkitpro.org sometimes returns 403 to GitHub runners, so this step retries
+      # and never fails the job: if the image already has the libraries, the build still works.
+      - name: Ensure libraries (retry, non-fatal)
+        continue-on-error: true
         run: |
-          dkp-pacman -Syu --noconfirm
-          dkp-pacman -S --noconfirm switch-sdl2 switch-sdl2_ttf switch-freetype switch-harfbuzz switch-bzip2 switch-libpng switch-zlib
+          for i in 1 2 3 4 5; do
+            dkp-pacman -Sy --noconfirm --needed switch-sdl2 switch-sdl2_ttf switch-freetype switch-harfbuzz switch-bzip2 switch-libpng switch-zlib && break
+            echo "attempt $i failed, retrying in 20s"; sleep 20
+          done
 
       - name: Build
         run: make
